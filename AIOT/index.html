@@ -1,0 +1,371 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Hệ Thống An Ninh Thông Minh Giám Sát Theo Thời Gian Thực</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 0; padding: 20px; background-color: #f0f0f0; color: #333; }
+        .container { max-width: 1200px; margin: auto; }
+        .header { text-align: center; background: #4a90e2; padding: 15px; border-radius: 8px 8px 0 0; font-size: 22px; font-weight: bold; color: #fff; }
+        .nodes { display: flex; justify-content: space-between; gap: 20px; }
+        .node { flex: 1; background: #ffffff; padding: 20px; border-radius: 8px; box-shadow: 0 4px 8px rgba(0,0,0,0.1); }
+        .node-title { font-size: 20px; margin-bottom: 20px; color: #333; display: flex; align-items: center; gap: 10px; font-weight: bold; }
+        .node-title::before { content: '•'; font-size: 30px; }
+        #node1 .node-title::before { color: #ff69b4; }
+        #node2 .node-title::before { color: #00bfff; }
+        .status-item { display: flex; justify-content: space-between; background: #f8f8f8; padding: 12px; margin-bottom: 10px; border-radius: 6px; border-left: 4px solid #4a90e2; }
+        .status-label { font-weight: bold; color: #555; }
+        .status-value { color: #000; font-weight: bold; }
+        .controls { display: flex; justify-content: space-around; margin: 25px 0; }
+        .control-group { background: #f8f8f8; padding: 15px; border-radius: 8px; text-align: center; width: 45%; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .control-group h4 { margin: 0 0 12px 0; font-size: 16px; color: #333; display: flex; align-items: center; justify-content: center; gap: 8px; }
+        button { padding: 12px 24px; background: #9b59b6; color: white; border: none; border-radius: 6px; cursor: pointer; font-weight: bold; font-size: 16px; transition: background 0.3s; }
+        button:hover { background: #8e44ad; }
+        button::before { margin-right: 8px; font-size: 18px; }
+        .on::before { content: '⏻'; }
+        .off::before { content: '⏼'; }
+        .ai-section { background: #e8f4fd; padding: 15px; border-radius: 8px; text-align: center; margin-top: 20px; font-size: 16px; color: #333; border: 1px solid #4a90e2; }
+        .chart-container { height: 250px; margin-top: 25px; background: #f8f8f8; padding: 15px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .chart-container canvas { background: #ffffff; border-radius: 6px; }
+        .log-section { background: #ffffff; padding: 20px; border-radius: 8px; margin-top: 40px; box-shadow: 0 4px 8px rgba(0,0,0,0.1); }
+        #log { height: 180px; overflow-y: scroll; background: #f0f0f0; padding: 15px; border-radius: 6px; margin-bottom: 15px; font-size: 14px; color: #333; border: 1px solid #ddd; }
+        #log p { margin: 6px 0; }
+        .export-btn { display: block; width: 220px; margin: 0 auto; background: #9b59b6; padding: 12px; border-radius: 6px; font-weight: bold; font-size: 16px; }
+    </style>
+    <script src="https://unpkg.com/mqtt/dist/mqtt.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/luxon"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-luxon"></script>
+</head>
+<body>
+    <div class="container">
+        <div class="header">HỆ THỐNG AN NINH THÔNG MINH GIÁM SÁT THEO THỜI GIAN THỰC</div>
+        <div class="nodes">
+            <!-- Node 1 -->
+            <div class="node" id="node1">
+                <div class="node-title">Node 1 - Kiểm soát khoảng cách & Âm thanh</div>
+                <div class="status-item"><span class="status-label">Khoảng cách:</span><span class="status-value" id="node1-distance">Đang kết nối...</span></div>
+                <div class="status-item"><span class="status-label">LED:</span><span class="status-value" id="node1-led">--</span></div>
+                <div class="status-item"><span class="status-label">Buzzer:</span><span class="status-value" id="node1-buzzer">--</span></div>
+                <div class="status-item"><span class="status-label">Âm thanh Peak:</span><span class="status-value" id="node1-audio">--</span></div>
+
+                <div class="controls">
+                    <div class="control-group">
+                        <h4>💡 Điều khiển LED</h4>
+                        <button class="on" onclick="sendControl('node1', 'led_on')">BẬT</button>
+                        <button class="off" onclick="sendControl('node1', 'led_off')">TẮT</button>
+                    </div>
+                    <div class="control-group">
+                        <h4>🔊 Điều khiển Còi</h4>
+                        <button class="on" onclick="sendControl('node1', 'buzzer_on')">BẬT</button>
+                        <button class="off" onclick="sendControl('node1', 'buzzer_off')">TẮT</button>
+                    </div>
+                </div>
+
+                <div class="chart-container"><canvas id="node1-chart"></canvas></div>
+            </div>
+
+            <!-- Node 2 -->
+            <div class="node" id="node2">
+                <div class="node-title">Node 2 - Kiểm soát lượng khí Gas</div>
+                <div class="status-item"><span class="status-label">LED:</span><span class="status-value" id="node2-led">--</span></div>
+                <div class="status-item"><span class="status-label">Buzzer:</span><span class="status-value" id="node2-buzzer">--</span></div>
+                <div class="status-item"><span class="status-label">Gas Value:</span><span class="status-value" id="node2-gas">--</span></div>
+
+                <div class="controls">
+                    <div class="control-group">
+                        <h4>💡 Điều khiển LED</h4>
+                        <button class="on" onclick="sendControl('node2', 'led_on')">BẬT</button>
+                        <button class="off" onclick="sendControl('node2', 'led_off')">TẮT</button>
+                    </div>
+                    <div class="control-group">
+                        <h4>🔊 Điều khiển Còi</h4>
+                        <button class="on" onclick="sendControl('node2', 'buzzer_on')">BẬT</button>
+                        <button class="off" onclick="sendControl('node2', 'buzzer_off')">TẮT</button>
+                    </div>
+                </div>
+
+                <div class="chart-container"><canvas id="node2-chart"></canvas></div>
+            </div>
+        </div>
+
+        <div class="log-section">
+            <div class="node-title">Log Hệ Thống Thời Gian Thực</div>
+            <div id="log"></div>
+            <button class="export-btn" onclick="exportLog()">XUẤT LOG</button>
+        </div>
+    </div>
+
+    <script>
+    const client = mqtt.connect('wss://broker.emqx.io:8084/mqtt', {
+    reconnectPeriod: 200,
+    keepalive: 30,
+    clean: true
+});
+
+    /* ================== CONTROL LOCK ================== */
+    const controlLock = {
+        node1: {
+            led: false,
+            buzzer: false
+        },
+        node2: {
+            led: false,
+            buzzer: false
+        }
+    };
+
+    function lock(node, type, time = 700) {
+        controlLock[node][type] = true;
+        setTimeout(() => {
+            controlLock[node][type] = false;
+        }, time);
+    }
+
+    /* ================== MQTT CONNECT ================== */
+    client.on('connect', () => {
+        client.subscribe(['node1/status', 'node1/ai_result', 'node2/status']);
+        addLog('Kết nối MQTT thành công');
+    });
+
+    /* ================== MQTT MESSAGE ================== */
+    client.on('message', (topic, message) => {
+        const data = message.toString();
+        addLog(`Nhận: ${topic} → ${data}`);
+
+        if (topic === 'node1/ai_result') {
+            document.getElementById('ai-label').textContent = data;
+            return;
+        }
+
+        try {
+            const json = JSON.parse(data);
+
+            /* ===== NODE 1 STATUS ===== */
+            if (topic === 'node1/status') {
+                document.getElementById('node1-distance').textContent =
+                    json.distance !== undefined ? json.distance + ' cm' : 'Đang kết nối...';
+
+                if (!controlLock.node1.led) {
+                    document.getElementById('node1-led').textContent =
+                        json.led ? 'ON' : 'OFF';
+                }
+
+                if (!controlLock.node1.buzzer) {
+                    document.getElementById('node1-buzzer').textContent =
+                        json.buzzer ? 'ON' : 'OFF';
+                }
+
+                document.getElementById('node1-audio').textContent =
+                    json.audio_peak ?? '--';
+
+    updateNode1Chart(
+    json.audio_peak ?? 0,
+    json.distance ?? 0
+);
+            }
+
+            /* ===== NODE 2 STATUS ===== */
+            if (topic === 'node2/status') {
+                if (!controlLock.node2.led) {
+                    document.getElementById('node2-led').textContent =
+                        json.led ? 'ON' : 'OFF';
+                }
+
+                if (!controlLock.node2.buzzer) {
+                    document.getElementById('node2-buzzer').textContent =
+                        json.buzzer ? 'ON' : 'OFF';
+                }
+
+                document.getElementById('node2-gas').textContent =
+                    json.gas ?? '--';
+
+                updateNode2Chart(json.gas || 0);
+            }
+
+        } catch (e) {
+            console.error('JSON parse error:', e);
+        }
+    });
+
+    /* ================== SEND CONTROL ================== */
+    function sendControl(node, command) {
+        const topic = node === 'node1'
+            ? 'node1/control'
+            : 'node2/control';
+
+        client.publish(topic, command);
+        addLog(`Gửi lệnh: ${node} → ${command}`);
+
+        /* ===== UI OPTIMISTIC (ANTI FLICKER) ===== */
+        if (command === 'led_on') {
+            lock(node, 'led');
+            document.getElementById(`${node}-led`).textContent = 'ON';
+        }
+
+        if (command === 'led_off') {
+            lock(node, 'led');
+            document.getElementById(`${node}-led`).textContent = 'OFF';
+        }
+
+        if (command === 'buzzer_on') {
+            lock(node, 'buzzer');
+            document.getElementById(`${node}-buzzer`).textContent = 'ON';
+        }
+
+        if (command === 'buzzer_off') {
+            lock(node, 'buzzer');
+            document.getElementById(`${node}-buzzer`).textContent = 'OFF';
+        }
+    }
+
+    /* ================== LOG ================== */
+    const logs = [];
+    function addLog(msg) {
+        const time = new Date().toLocaleString('vi-VN');
+        const entry = `[${time}] ${msg}`;
+        logs.push(entry);
+
+        const logDiv = document.getElementById('log');
+        const p = document.createElement('p');
+        p.textContent = entry;
+        logDiv.appendChild(p);
+        logDiv.scrollTop = logDiv.scrollHeight;
+    }
+
+    function exportLog() {
+        const blob = new Blob([logs.join('\n')], { type: 'text/plain' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = 'log_he_thong.txt';
+        a.click();
+    }
+
+/* ================== NODE 1 CHART (AUDIO + DISTANCE) ================== */
+const node1Ctx = document.getElementById('node1-chart').getContext('2d');
+
+const node1Chart = new Chart(node1Ctx, {
+    type: 'line',
+    data: {
+        datasets: [
+            {
+                label: 'Audio Peak',
+                data: [],
+                borderColor: '#ff69b4',
+                tension: 0.3,
+                yAxisID: 'yAudio'
+            },
+            {
+                label: 'Khoảng cách (cm)',
+                data: [],
+                borderColor: '#4a90e2',
+                tension: 0.3,
+                yAxisID: 'yDistance'
+            }
+        ]
+    },
+    options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        animation: false,
+        scales: {
+            x: {
+                type: 'time',
+                time: {
+                    unit: 'second'
+                }
+            },
+            yAudio: {
+                type: 'linear',
+                position: 'left',
+                title: {
+                    display: true,
+                    text: 'Audio Peak'
+                },
+                beginAtZero: true
+            },
+            yDistance: {
+                type: 'linear',
+                position: 'right',
+                title: {
+                    display: true,
+                    text: 'Khoảng cách (cm)'
+                },
+                min: 0,
+                max: 300,
+                grid: {
+                    drawOnChartArea: false
+                }
+            }
+        }
+    }
+});
+
+  function updateNode1Chart(audio, distance) {
+    const now = new Date();
+
+    node1Chart.data.datasets[0].data.push({
+        x: now,
+        y: audio
+    });
+
+    node1Chart.data.datasets[1].data.push({
+        x: now,
+        y: distance
+    });
+
+    if (node1Chart.data.datasets[0].data.length > 50) {
+        node1Chart.data.datasets[0].data.shift();
+        node1Chart.data.datasets[1].data.shift();
+    }
+
+    node1Chart.update('none');
+}
+
+    /* ================== NODE 2 CHART ================== */
+    const node2Ctx = document.getElementById('node2-chart').getContext('2d');
+    const node2Chart = new Chart(node2Ctx, {
+        type: 'line',
+        data: {
+            datasets: [{
+                label: 'Gas Value',
+                data: [],
+                borderColor: '#ff0000',
+                tension: 0.3
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            scales: {
+                x: {
+                    type: 'time',
+                    time: {
+                        unit: 'second',
+                        displayFormats: { second: 'HH:mm:ss' }
+                    }
+                },
+                y: {
+                    title: {
+                        display: true,
+                        text: 'Gas Value'
+                    }
+                }
+            }
+        }
+    });
+
+    function updateNode2Chart(gas) {
+        const now = new Date();
+        node2Chart.data.datasets[0].data.push({ x: now, y: gas });
+        if (node2Chart.data.datasets[0].data.length > 50) {
+            node2Chart.data.datasets[0].data.shift();
+        }
+        node2Chart.update('none');
+    }
+</script>
+
+</body>
+</html>
