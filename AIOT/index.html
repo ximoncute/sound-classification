@@ -10,21 +10,78 @@
         .header { text-align: center; background: #4a90e2; padding: 15px; border-radius: 8px 8px 0 0; font-size: 22px; font-weight: bold; color: #fff; }
         .nodes { display: flex; justify-content: space-between; gap: 20px; }
         .node { flex: 1; background: #ffffff; padding: 20px; border-radius: 8px; box-shadow: 0 4px 8px rgba(0,0,0,0.1); }
-        .node-title { font-size: 20px; margin-bottom: 20px; color: #333; display: flex; align-items: center; gap: 10px; font-weight: bold; }
+        .node-title { font-size: 20px; margin-bottom: 10px; color: #333; display: flex; align-items: center; gap: 10px; font-weight: bold; }
         .node-title::before { content: '•'; font-size: 30px; }
         #node1 .node-title::before { color: #ff69b4; }
         #node2 .node-title::before { color: #00bfff; }
+        
+        /* Mode selector */
+        .mode-selector { 
+            margin-bottom: 20px; 
+            display: flex; 
+            gap: 10px; 
+            background: #f8f8f8; 
+            padding: 12px; 
+            border-radius: 6px; 
+            justify-content: center;
+        }
+        .mode-btn { 
+            padding: 10px 20px; 
+            border: none; 
+            border-radius: 6px; 
+            cursor: pointer; 
+            font-weight: bold; 
+            font-size: 14px; 
+            transition: all 0.3s; 
+            flex: 1;
+            max-width: 120px;
+        }
+        .auto-btn { 
+            background: #2ecc71; 
+            color: white; 
+        }
+        .auto-btn.active { 
+            background: #27ae60; 
+            box-shadow: 0 0 0 2px white, 0 0 0 4px #27ae60;
+        }
+        .manual-btn { 
+            background: #e74c3c; 
+            color: white; 
+        }
+        .manual-btn.active { 
+            background: #c0392b; 
+            box-shadow: 0 0 0 2px white, 0 0 0 4px #c0392b;
+        }
+        .mode-btn.disabled { 
+            opacity: 0.6; 
+            cursor: not-allowed; 
+        }
+        
         .status-item { display: flex; justify-content: space-between; background: #f8f8f8; padding: 12px; margin-bottom: 10px; border-radius: 6px; border-left: 4px solid #4a90e2; }
         .status-label { font-weight: bold; color: #555; }
         .status-value { color: #000; font-weight: bold; }
+        .status-badge {
+            display: inline-block;
+            padding: 2px 8px;
+            border-radius: 10px;
+            font-size: 12px;
+            margin-left: 5px;
+        }
+        .override-badge {
+            background: #ff9800;
+            color: white;
+        }
+        
         .controls { display: flex; justify-content: space-around; margin: 25px 0; }
         .control-group { background: #f8f8f8; padding: 15px; border-radius: 8px; text-align: center; width: 45%; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
         .control-group h4 { margin: 0 0 12px 0; font-size: 16px; color: #333; display: flex; align-items: center; justify-content: center; gap: 8px; }
         button { padding: 12px 24px; background: #9b59b6; color: white; border: none; border-radius: 6px; cursor: pointer; font-weight: bold; font-size: 16px; transition: background 0.3s; }
         button:hover { background: #8e44ad; }
+        button:disabled { background: #cccccc; cursor: not-allowed; }
         button::before { margin-right: 8px; font-size: 18px; }
         .on::before { content: '⏻'; }
         .off::before { content: '⏼'; }
+        
         .ai-section { background: #e8f4fd; padding: 15px; border-radius: 8px; text-align: center; margin-top: 20px; font-size: 16px; color: #333; border: 1px solid #4a90e2; }
         .chart-container { height: 250px; margin-top: 25px; background: #f8f8f8; padding: 15px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
         .chart-container canvas { background: #ffffff; border-radius: 6px; }
@@ -45,21 +102,42 @@
             <!-- Node 1 -->
             <div class="node" id="node1">
                 <div class="node-title">Node 1 - Kiểm soát khoảng cách & Âm thanh</div>
-                <div class="status-item"><span class="status-label">Khoảng cách:</span><span class="status-value" id="node1-distance">Đang kết nối...</span></div>
-                <div class="status-item"><span class="status-label">LED:</span><span class="status-value" id="node1-led">--</span></div>
-                <div class="status-item"><span class="status-label">Buzzer:</span><span class="status-value" id="node1-buzzer">--</span></div>
-                <div class="status-item"><span class="status-label">Âm thanh Peak:</span><span class="status-value" id="node1-audio">--</span></div>
+                
+                <!-- Mode selector for Node 1 -->
+                <div class="mode-selector">
+                    <button id="node1-auto" class="mode-btn auto-btn active" onclick="setMode('node1', 'auto')">AUTO</button>
+                    <button id="node1-manual" class="mode-btn manual-btn" onclick="setMode('node1', 'manual')">THỦ CÔNG</button>
+                </div>
+                
+                <div class="status-item">
+                    <span class="status-label">Khoảng cách:</span>
+                    <span class="status-value" id="node1-distance">Đang kết nối...</span>
+                </div>
+                <div class="status-item">
+                    <span class="status-label">LED:</span>
+                    <span class="status-value" id="node1-led">--</span>
+                    <span id="node1-led-badge" class="status-badge override-badge" style="display: none;">MANUAL</span>
+                </div>
+                <div class="status-item">
+                    <span class="status-label">Buzzer:</span>
+                    <span class="status-value" id="node1-buzzer">--</span>
+                    <span id="node1-buzzer-badge" class="status-badge override-badge" style="display: none;">MANUAL</span>
+                </div>
+                <div class="status-item">
+                    <span class="status-label">Âm thanh Peak:</span>
+                    <span class="status-value" id="node1-audio">--</span>
+                </div>
 
                 <div class="controls">
                     <div class="control-group">
                         <h4>💡 Điều khiển LED</h4>
-                        <button class="on" onclick="sendControl('node1', 'led_on')">BẬT</button>
-                        <button class="off" onclick="sendControl('node1', 'led_off')">TẮT</button>
+                        <button id="node1-led-on" class="on" onclick="sendControl('node1', 'led_on')" disabled>BẬT</button>
+                        <button id="node1-led-off" class="off" onclick="sendControl('node1', 'led_off')" disabled>TẮT</button>
                     </div>
                     <div class="control-group">
                         <h4>🔊 Điều khiển Còi</h4>
-                        <button class="on" onclick="sendControl('node1', 'buzzer_on')">BẬT</button>
-                        <button class="off" onclick="sendControl('node1', 'buzzer_off')">TẮT</button>
+                        <button id="node1-buzzer-on" class="on" onclick="sendControl('node1', 'buzzer_on')" disabled>BẬT</button>
+                        <button id="node1-buzzer-off" class="off" onclick="sendControl('node1', 'buzzer_off')" disabled>TẮT</button>
                     </div>
                 </div>
 
@@ -69,20 +147,38 @@
             <!-- Node 2 -->
             <div class="node" id="node2">
                 <div class="node-title">Node 2 - Kiểm soát lượng khí Gas</div>
-                <div class="status-item"><span class="status-label">LED:</span><span class="status-value" id="node2-led">--</span></div>
-                <div class="status-item"><span class="status-label">Buzzer:</span><span class="status-value" id="node2-buzzer">--</span></div>
-                <div class="status-item"><span class="status-label">Gas Value:</span><span class="status-value" id="node2-gas">--</span></div>
+                
+                <!-- Mode selector for Node 2 -->
+                <div class="mode-selector">
+                    <button id="node2-auto" class="mode-btn auto-btn active" onclick="setMode('node2', 'auto')">AUTO</button>
+                    <button id="node2-manual" class="mode-btn manual-btn" onclick="setMode('node2', 'manual')">THỦ CÔNG</button>
+                </div>
+                
+                <div class="status-item">
+                    <span class="status-label">LED:</span>
+                    <span class="status-value" id="node2-led">--</span>
+                    <span id="node2-led-badge" class="status-badge override-badge" style="display: none;">MANUAL</span>
+                </div>
+                <div class="status-item">
+                    <span class="status-label">Buzzer:</span>
+                    <span class="status-value" id="node2-buzzer">--</span>
+                    <span id="node2-buzzer-badge" class="status-badge override-badge" style="display: none;">MANUAL</span>
+                </div>
+                <div class="status-item">
+                    <span class="status-label">Gas Value:</span>
+                    <span class="status-value" id="node2-gas">--</span>
+                </div>
 
                 <div class="controls">
                     <div class="control-group">
                         <h4>💡 Điều khiển LED</h4>
-                        <button class="on" onclick="sendControl('node2', 'led_on')">BẬT</button>
-                        <button class="off" onclick="sendControl('node2', 'led_off')">TẮT</button>
+                        <button id="node2-led-on" class="on" onclick="sendControl('node2', 'led_on')" disabled>BẬT</button>
+                        <button id="node2-led-off" class="off" onclick="sendControl('node2', 'led_off')" disabled>TẮT</button>
                     </div>
                     <div class="control-group">
                         <h4>🔊 Điều khiển Còi</h4>
-                        <button class="on" onclick="sendControl('node2', 'buzzer_on')">BẬT</button>
-                        <button class="off" onclick="sendControl('node2', 'buzzer_off')">TẮT</button>
+                        <button id="node2-buzzer-on" class="on" onclick="sendControl('node2', 'buzzer_on')" disabled>BẬT</button>
+                        <button id="node2-buzzer-off" class="off" onclick="sendControl('node2', 'buzzer_off')" disabled>TẮT</button>
                     </div>
                 </div>
 
@@ -99,10 +195,38 @@
 
     <script>
     const client = mqtt.connect('wss://broker.emqx.io:8084/mqtt', {
-    reconnectPeriod: 200,
-    keepalive: 30,
-    clean: true
-});
+        reconnectPeriod: 200,
+        keepalive: 30,
+        clean: true
+    });
+
+    /* ================== MODE MANAGEMENT ================== */
+    const nodeModes = {
+        node1: 'auto',  // 'auto' or 'manual'
+        node2: 'auto'
+    };
+
+    function setMode(node, mode) {
+        // Update mode
+        nodeModes[node] = mode;
+        
+        // Update UI buttons
+        document.getElementById(`${node}-auto`).classList.toggle('active', mode === 'auto');
+        document.getElementById(`${node}-manual`).classList.toggle('active', mode === 'manual');
+        
+        // Enable/disable control buttons
+        const isManual = (mode === 'manual');
+        document.getElementById(`${node}-led-on`).disabled = !isManual;
+        document.getElementById(`${node}-led-off`).disabled = !isManual;
+        document.getElementById(`${node}-buzzer-on`).disabled = !isManual;
+        document.getElementById(`${node}-buzzer-off`).disabled = !isManual;
+        
+        // Add log
+        addLog(`${node.toUpperCase()}: Chuyển sang chế độ ${mode === 'auto' ? 'TỰ ĐỘNG' : 'THỦ CÔNG'}`);
+        
+        // Send mode notification to MQTT (optional)
+        client.publish(`${node}/mode`, mode);
+    }
 
     /* ================== CONTROL LOCK ================== */
     const controlLock = {
@@ -147,35 +271,52 @@
                 document.getElementById('node1-distance').textContent =
                     json.distance !== undefined ? json.distance + ' cm' : 'Đang kết nối...';
 
+                // Update LED status with override indicator
+                const ledElement = document.getElementById('node1-led');
+                const ledBadge = document.getElementById('node1-led-badge');
                 if (!controlLock.node1.led) {
-                    document.getElementById('node1-led').textContent =
-                        json.led ? 'ON' : 'OFF';
+                    ledElement.textContent = json.led ? 'ON' : 'OFF';
+                    if (json.led_override !== undefined) {
+                        ledBadge.style.display = json.led_override ? 'inline-block' : 'none';
+                    }
                 }
 
+                // Update Buzzer status with override indicator
+                const buzzerElement = document.getElementById('node1-buzzer');
+                const buzzerBadge = document.getElementById('node1-buzzer-badge');
                 if (!controlLock.node1.buzzer) {
-                    document.getElementById('node1-buzzer').textContent =
-                        json.buzzer ? 'ON' : 'OFF';
+                    buzzerElement.textContent = json.buzzer ? 'ON' : 'OFF';
+                    if (json.buzzer_override !== undefined) {
+                        buzzerBadge.style.display = json.buzzer_override ? 'inline-block' : 'none';
+                    }
                 }
 
                 document.getElementById('node1-audio').textContent =
                     json.audio_peak ?? '--';
 
-    updateNode1Chart(
-    json.audio_peak ?? 0,
-    json.distance ?? 0
-);
+                updateNode1Chart(json.audio_peak ?? 0, json.distance ?? 0);
             }
 
             /* ===== NODE 2 STATUS ===== */
             if (topic === 'node2/status') {
+                // Update LED status with override indicator
+                const ledElement = document.getElementById('node2-led');
+                const ledBadge = document.getElementById('node2-led-badge');
                 if (!controlLock.node2.led) {
-                    document.getElementById('node2-led').textContent =
-                        json.led ? 'ON' : 'OFF';
+                    ledElement.textContent = json.led ? 'ON' : 'OFF';
+                    if (json.led_override !== undefined) {
+                        ledBadge.style.display = json.led_override ? 'inline-block' : 'none';
+                    }
                 }
 
+                // Update Buzzer status with override indicator
+                const buzzerElement = document.getElementById('node2-buzzer');
+                const buzzerBadge = document.getElementById('node2-buzzer-badge');
                 if (!controlLock.node2.buzzer) {
-                    document.getElementById('node2-buzzer').textContent =
-                        json.buzzer ? 'ON' : 'OFF';
+                    buzzerElement.textContent = json.buzzer ? 'ON' : 'OFF';
+                    if (json.buzzer_override !== undefined) {
+                        buzzerBadge.style.display = json.buzzer_override ? 'inline-block' : 'none';
+                    }
                 }
 
                 document.getElementById('node2-gas').textContent =
@@ -191,6 +332,12 @@
 
     /* ================== SEND CONTROL ================== */
     function sendControl(node, command) {
+        // Check if manual mode is enabled
+        if (nodeModes[node] !== 'manual') {
+            addLog(`⚠️ ${node.toUpperCase()}: Không thể điều khiển trong chế độ AUTO`);
+            return;
+        }
+        
         const topic = node === 'node1'
             ? 'node1/control'
             : 'node2/control';
@@ -202,21 +349,25 @@
         if (command === 'led_on') {
             lock(node, 'led');
             document.getElementById(`${node}-led`).textContent = 'ON';
+            document.getElementById(`${node}-led-badge`).style.display = 'inline-block';
         }
 
         if (command === 'led_off') {
             lock(node, 'led');
             document.getElementById(`${node}-led`).textContent = 'OFF';
+            document.getElementById(`${node}-led-badge`).style.display = 'inline-block';
         }
 
         if (command === 'buzzer_on') {
             lock(node, 'buzzer');
             document.getElementById(`${node}-buzzer`).textContent = 'ON';
+            document.getElementById(`${node}-buzzer-badge`).style.display = 'inline-block';
         }
 
         if (command === 'buzzer_off') {
             lock(node, 'buzzer');
             document.getElementById(`${node}-buzzer`).textContent = 'OFF';
+            document.getElementById(`${node}-buzzer-badge`).style.display = 'inline-block';
         }
     }
 
@@ -243,86 +394,85 @@
         a.click();
     }
 
-/* ================== NODE 1 CHART (AUDIO + DISTANCE) ================== */
-const node1Ctx = document.getElementById('node1-chart').getContext('2d');
-
-const node1Chart = new Chart(node1Ctx, {
-    type: 'line',
-    data: {
-        datasets: [
-            {
-                label: 'Audio Peak',
-                data: [],
-                borderColor: '#ff69b4',
-                tension: 0.3,
-                yAxisID: 'yAudio'
-            },
-            {
-                label: 'Khoảng cách (cm)',
-                data: [],
-                borderColor: '#4a90e2',
-                tension: 0.3,
-                yAxisID: 'yDistance'
-            }
-        ]
-    },
-    options: {
-        responsive: true,
-        maintainAspectRatio: false,
-        animation: false,
-        scales: {
-            x: {
-                type: 'time',
-                time: {
-                    unit: 'second'
+    /* ================== NODE 1 CHART (AUDIO + DISTANCE) ================== */
+    const node1Ctx = document.getElementById('node1-chart').getContext('2d');
+    const node1Chart = new Chart(node1Ctx, {
+        type: 'line',
+        data: {
+            datasets: [
+                {
+                    label: 'Audio Peak',
+                    data: [],
+                    borderColor: '#ff69b4',
+                    tension: 0.3,
+                    yAxisID: 'yAudio'
+                },
+                {
+                    label: 'Khoảng cách (cm)',
+                    data: [],
+                    borderColor: '#4a90e2',
+                    tension: 0.3,
+                    yAxisID: 'yDistance'
                 }
-            },
-            yAudio: {
-                type: 'linear',
-                position: 'left',
-                title: {
-                    display: true,
-                    text: 'Audio Peak'
+            ]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            animation: false,
+            scales: {
+                x: {
+                    type: 'time',
+                    time: {
+                        unit: 'second'
+                    }
                 },
-                beginAtZero: true
-            },
-            yDistance: {
-                type: 'linear',
-                position: 'right',
-                title: {
-                    display: true,
-                    text: 'Khoảng cách (cm)'
+                yAudio: {
+                    type: 'linear',
+                    position: 'left',
+                    title: {
+                        display: true,
+                        text: 'Audio Peak'
+                    },
+                    beginAtZero: true
                 },
-                min: 0,
-                max: 300,
-                grid: {
-                    drawOnChartArea: false
+                yDistance: {
+                    type: 'linear',
+                    position: 'right',
+                    title: {
+                        display: true,
+                        text: 'Khoảng cách (cm)'
+                    },
+                    min: 0,
+                    max: 300,
+                    grid: {
+                        drawOnChartArea: false
+                    }
                 }
             }
         }
-    }
-});
-
-  function updateNode1Chart(audio, distance) {
-    const now = new Date();
-
-    node1Chart.data.datasets[0].data.push({
-        x: now,
-        y: audio
     });
 
-    node1Chart.data.datasets[1].data.push({
-        x: now,
-        y: distance
-    });
+    function updateNode1Chart(audio, distance) {
+        const now = new Date();
 
-    if (node1Chart.data.datasets[0].data.length > 50) {
-        node1Chart.data.datasets[0].data.shift();
-        node1Chart.data.datasets[1].data.shift();
+        node1Chart.data.datasets[0].data.push({
+            x: now,
+            y: audio
+        });
+
+        node1Chart.data.datasets[1].data.push({
+            x: now,
+            y: distance
+        });
+
+        if (node1Chart.data.datasets[0].data.length > 50) {
+            node1Chart.data.datasets[0].data.shift();
+            node1Chart.data.datasets[1].data.shift();
+        }
+
+        node1Chart.update('none');
     }
-
-    node1Chart.update('none');
-}
 
     /* ================== NODE 2 CHART ================== */
     const node2Ctx = document.getElementById('node2-chart').getContext('2d');
@@ -365,7 +515,6 @@ const node1Chart = new Chart(node1Ctx, {
         }
         node2Chart.update('none');
     }
-</script>
-
+    </script>
 </body>
 </html>

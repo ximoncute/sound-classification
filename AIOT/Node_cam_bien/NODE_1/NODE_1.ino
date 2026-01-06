@@ -16,6 +16,7 @@ const char* mqtt_server = "broker.emqx.io";
 const char* topic_status  = "node1/status";
 const char* topic_control = "node1/control";
 const char* topic_audio   = "audio/chunk1";
+const char* topic_mode    = "node1/mode";  // Thêm topic nhận chế độ
 
 /* ================= CONFIG ================= */
 #define DISTANCE_THRESHOLD 50
@@ -24,6 +25,7 @@ const char* topic_audio   = "audio/chunk1";
 #define DISTANCE_INTERVAL  40
 #define AUDIO_INTERVAL     5
 #define STATUS_INTERVAL    80
+#define MANUAL_TIMEOUT     600000  // 10 phút (600000 ms)
 
 #define DIST_MIN_CM  2
 #define DIST_MAX_CM  300
@@ -42,9 +44,13 @@ bool ledState = false;
 bool buzzerState = false;
 bool ledManualOverride = false;
 bool buzzerManualOverride = false;
+bool isManualMode = false;  // true = manual, false = auto
 
 float currentDistance = -1;
 int audioPeak = 0;
+
+// Timer cho manual override
+unsigned long manualModeStartTime = 0;
 
 /* ================= MQTT ================= */
 WiFiClient espClient;
@@ -97,7 +103,8 @@ void processDistance() {
   float d = readDistanceStable();
   if (d > 0) {
     currentDistance = d;
-    if (!ledManualOverride) {
+    // Chỉ điều khiển LED tự động khi ở chế độ AUTO
+    if (!isManualMode && !ledManualOverride) {
       ledState = (d < DISTANCE_THRESHOLD);
       digitalWrite(LED_PIN, ledState ? HIGH : LOW);
     }
@@ -113,7 +120,8 @@ void processAudioPeak() {
   int v = abs(analogRead(MIC_PIN) - 512);
   audioPeak = max(audioPeak, v);
 
-  if (!buzzerManualOverride) {
+  // Chỉ điều khiển buzzer tự động khi ở chế độ AUTO
+  if (!isManualMode && !buzzerManualOverride) {
     buzzerState = (audioPeak > BUZZER_THRESHOLD);
     digitalWrite(BUZZER_PIN, buzzerState ? HIGH : LOW);
   }
@@ -139,6 +147,21 @@ void streamAudioRaw() {
   }
 }
 
+/* ================= CHECK MANUAL TIMEOUT ================= */
+void checkManualTimeout() {
+  if (isManualMode && (millis() - manualModeStartTime >= MANUAL_TIMEOUT)) {
+    // Tự động chuyển về chế độ AUTO sau 10 phút
+    isManualMode = false;
+    ledManualOverride = false;
+    buzzerManualOverride = false;
+    
+    Serial.println("NODE1: Tự động chuyển về chế độ AUTO sau 10 phút");
+    
+    // Gửi thông báo mode lên MQTT
+    client.publish(topic_mode, "auto", false);
+  }
+}
+
 /* ================= STATUS ================= */
 void publishStatus() {
   static unsigned long lastSend = 0;
@@ -149,7 +172,10 @@ void publishStatus() {
   json += "\"distance\":" + String(currentDistance, 1) + ",";
   json += "\"audio_peak\":" + String(audioPeak) + ",";
   json += "\"led\":" + String(ledState ? "true" : "false") + ",";
-  json += "\"buzzer\":" + String(buzzerState ? "true" : "false");
+  json += "\"buzzer\":" + String(buzzerState ? "true" : "false") + ",";
+  json += "\"led_override\":" + String(ledManualOverride ? "true" : "false") + ",";
+  json += "\"buzzer_override\":" + String(buzzerManualOverride ? "true" : "false") + ",";
+  json += "\"mode\":" + String(isManualMode ? "\"manual\"" : "\"auto\"");
   json += "}";
 
   client.publish(topic_status, json.c_str(), false);
@@ -158,31 +184,56 @@ void publishStatus() {
 
 /* ================= CALLBACK ================= */
 void callback(char* topic, byte* payload, unsigned int length) {
-  if (String(topic) != topic_control) return;
-
-  String cmd;
+  String topicStr = String(topic);
+  String cmd = "";
   for (int i = 0; i < length; i++) cmd += (char)payload[i];
   cmd.toLowerCase();
 
-  if (cmd == "led_on") {
-    ledManualOverride = true;
-    ledState = true;
-    digitalWrite(LED_PIN, HIGH);
+  // Xử lý lệnh điều khiển
+  if (topicStr == topic_control) {
+    if (!isManualMode) {
+      Serial.println("NODE1: Từ chối lệnh - Đang ở chế độ AUTO");
+      return; // Bỏ qua lệnh nếu không ở chế độ manual
+    }
+    
+    if (cmd == "led_on") {
+      ledManualOverride = true;
+      ledState = true;
+      digitalWrite(LED_PIN, HIGH);
+      Serial.println("NODE1: LED manual ON");
+    }
+    else if (cmd == "led_off") {
+      ledManualOverride = false;
+      ledState = false;
+      digitalWrite(LED_PIN, LOW);
+      Serial.println("NODE1: LED manual OFF");
+    }
+    else if (cmd == "buzzer_on") {
+      buzzerManualOverride = true;
+      buzzerState = true;
+      digitalWrite(BUZZER_PIN, HIGH);
+      Serial.println("NODE1: BUZZER manual ON");
+    }
+    else if (cmd == "buzzer_off") {
+      buzzerManualOverride = false;
+      buzzerState = false;
+      digitalWrite(BUZZER_PIN, LOW);
+      Serial.println("NODE1: BUZZER manual OFF");
+    }
   }
-  else if (cmd == "led_off") {
-    ledManualOverride = false;
-    ledState = false;
-    digitalWrite(LED_PIN, LOW);
-  }
-  else if (cmd == "buzzer_on") {
-    buzzerManualOverride = true;
-    buzzerState = true;
-    digitalWrite(BUZZER_PIN, HIGH);
-  }
-  else if (cmd == "buzzer_off") {
-    buzzerManualOverride = false;
-    buzzerState = false;
-    digitalWrite(BUZZER_PIN, LOW);
+  // Xử lý chế độ từ web
+  else if (topicStr == topic_mode) {
+    if (cmd == "manual") {
+      isManualMode = true;
+      manualModeStartTime = millis(); // Reset timer
+      Serial.println("NODE1: Chuyển sang chế độ MANUAL");
+    }
+    else if (cmd == "auto") {
+      isManualMode = false;
+      ledManualOverride = false;
+      buzzerManualOverride = false;
+      Serial.println("NODE1: Chuyển sang chế độ AUTO");
+    }
   }
 }
 
@@ -197,16 +248,23 @@ void setup() {
 
   WiFi.begin(ssid, password);
   while (WiFi.status() != WL_CONNECTED) delay(300);
+  Serial.println("NODE1: WiFi connected!");
 
   client.setServer(mqtt_server, 1883);
   client.setCallback(callback);
 
   while (!client.connected()) {
-    client.connect("NODE1_AI_READY");
-    delay(300);
+    if (client.connect("NODE1_AI_READY")) {
+      Serial.println("NODE1: MQTT connected!");
+      client.subscribe(topic_control);
+      client.subscribe(topic_mode); // Subscribe topic mode
+      Serial.println("NODE1: Subscribed to control & mode topics");
+    } else {
+      Serial.print("NODE1: MQTT connection failed, rc=");
+      Serial.println(client.state());
+      delay(300);
+    }
   }
-
-  client.subscribe(topic_control);
 }
 
 /* ================= LOOP ================= */
@@ -215,8 +273,8 @@ void loop() {
 
   processDistance();
   processAudioPeak();
+  checkManualTimeout(); // Kiểm tra timeout chế độ manual
   publishStatus();
-
   streamAudioRaw();   // <<< CỰC KỲ QUAN TRỌNG CHO AI
 
   yield();
